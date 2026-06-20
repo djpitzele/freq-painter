@@ -1,18 +1,9 @@
-# freq-painter
+# Frequency Painter
 
-A small toy that lets you paint/draw the same image in both the spatial and
-frequency domains at the same time. Two panes appear side by side: the left
-shows the image in the spatial domain, the right shows its (log-magnitude,
-fft-shifted) Fourier transform. Painting on either pane updates the single
-underlying image and both views stay in sync.
-
-Single-channel (grayscale) only.
+A small program that lets you paint/draw the same image in both the spatial and frequency domains at the same time. Both views represent the same image and they sync automatically.
 
 ## Install
-
-```bash
-pip install -r requirements.txt
-```
+The only requirements are Python 3, numpy, matplotlib, and Pillow.
 
 ## Run
 
@@ -37,27 +28,7 @@ python freq_painter.py path/to/image.png --size 512
 - `c`: clear the canvas to black.
 - `s`: save the current spatial image to `out.png`.
 
-A stroke stays on the pane where it started until you release the button, so
-you can drag off and back on without the brush jumping to the other pane.
+## Details
+Phase is initialized as zero for a blank image and is preserved throughout the painting process (since frequency painting only affects amplitude). Due to the repeated conversion between the frequency and spatial domains, the program may have trouble maintining asymmetric images. Additionally, all images are in greyscale for simplicity.
 
-## How freq-domain painting works
-
-The canonical state is a single 2D real-valued grayscale array. The right
-pane displays `log(1 + |fftshift(fft2(image))|)`.
-
-When you paint on the right pane, the brush adjusts the magnitude of the FFT
-in log space (so the brush is perceptually uniform with the displayed view)
-while preserving the existing phase. The result is then converted back to
-the spatial domain via `real(ifft2(ifftshift(F)))`, which both keeps the
-spatial image real-valued and ensures the next FFT we display is
-Hermitian-symmetric automatically.
-
-### Limitations
-
-- Because the freq-domain edit round-trips through `real(ifft2(...))`, the
-  imaginary component caused by an asymmetric edit is silently discarded.
-  In practice this means roughly half the "energy" of a single-pixel
-  freq-domain stroke is lost. This is the intended trade-off for not having
-  to manage Hermitian conjugate-symmetric mirroring by hand.
-- Phase is preserved internally but not visualized.
-- One color channel only.
+*This program was created with heavy assistance from AI coding tools.*
