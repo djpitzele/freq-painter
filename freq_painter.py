@@ -12,12 +12,17 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.widgets import Slider
 from PIL import Image
 
 SAVE_PATH = "out.png"
 DEFAULT_SIZE = 256
 DEFAULT_BRUSH_RADIUS = 5
 DEFAULT_BRUSH_STRENGTH = 0.2
+
+BRUSH_RADIUS_MIN = 1
+BRUSH_STRENGTH_MIN = 0.01
+BRUSH_STRENGTH_MAX = 4.0
 
 
 class FreqPainter:
@@ -68,7 +73,34 @@ class FreqPainter:
         self.fig.canvas.mpl_connect("button_release_event", self._on_release)
         self.fig.canvas.mpl_connect("key_press_event", self._on_key)
 
-        self.fig.tight_layout()
+        # Reserve room at the bottom for the two sliders. Using subplots_adjust
+        # instead of tight_layout so the slider axes don't get shoved around.
+        self.fig.subplots_adjust(
+            left=0.04, right=0.98, top=0.94, bottom=0.18, wspace=0.06
+        )
+
+        max_radius = max(BRUSH_RADIUS_MIN + 1, min(self.image.shape) // 2)
+        ax_radius = self.fig.add_axes([0.20, 0.10, 0.65, 0.025])
+        ax_strength = self.fig.add_axes([0.20, 0.04, 0.65, 0.025])
+        self.radius_slider = Slider(
+            ax=ax_radius,
+            label="brush width",
+            valmin=BRUSH_RADIUS_MIN,
+            valmax=max_radius,
+            valinit=self.brush_radius,
+            valstep=1,
+            valfmt="%d",
+        )
+        self.strength_slider = Slider(
+            ax=ax_strength,
+            label="brush strength",
+            valmin=BRUSH_STRENGTH_MIN,
+            valmax=BRUSH_STRENGTH_MAX,
+            valinit=self.brush_strength,
+            valfmt="%.2f",
+        )
+        self.radius_slider.on_changed(self._on_radius_slider)
+        self.strength_slider.on_changed(self._on_strength_slider)
 
     @staticmethod
     def _disable_conflicting_keymaps() -> None:
@@ -216,20 +248,48 @@ class FreqPainter:
             self._active_button = None
             self._active_ax = None
 
+    # --------------------------------------------------------- brush controls
+
+    def _on_radius_slider(self, val: float) -> None:
+        self.brush_radius = max(BRUSH_RADIUS_MIN, int(round(val)))
+
+    def _on_strength_slider(self, val: float) -> None:
+        self.brush_strength = float(val)
+
+    def _set_brush_radius(self, value: float) -> None:
+        clamped = int(round(max(self.radius_slider.valmin,
+                                min(self.radius_slider.valmax, value))))
+        self.brush_radius = clamped
+        # Update the slider without retriggering its callback.
+        self.radius_slider.eventson = False
+        try:
+            self.radius_slider.set_val(clamped)
+        finally:
+            self.radius_slider.eventson = True
+
+    def _set_brush_strength(self, value: float) -> None:
+        clamped = float(max(self.strength_slider.valmin,
+                            min(self.strength_slider.valmax, value)))
+        self.brush_strength = clamped
+        self.strength_slider.eventson = False
+        try:
+            self.strength_slider.set_val(clamped)
+        finally:
+            self.strength_slider.eventson = True
+
     def _on_key(self, event) -> None:
         key = event.key
         if key == "[":
-            self.brush_radius = max(1, self.brush_radius - 1)
+            self._set_brush_radius(self.brush_radius - 1)
             print(f"brush radius = {self.brush_radius}")
         elif key == "]":
-            max_r = max(1, min(self.image.shape) // 2)
-            self.brush_radius = min(max_r, self.brush_radius + 1)
+            self._set_brush_radius(self.brush_radius + 1)
             print(f"brush radius = {self.brush_radius}")
         elif key == "-":
-            self.brush_strength = max(0.01, self.brush_strength * 0.8)
+            self._set_brush_strength(self.brush_strength * 0.8)
             print(f"brush strength = {self.brush_strength:.3f}")
         elif key in ("=", "+"):
-            self.brush_strength = min(4.0, self.brush_strength * 1.25)
+            self._set_brush_strength(self.brush_strength * 1.25)
             print(f"brush strength = {self.brush_strength:.3f}")
         elif key == "c":
             self.image[...] = 0.0
